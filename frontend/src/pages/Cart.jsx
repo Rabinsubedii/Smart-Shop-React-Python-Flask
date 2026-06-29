@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import { HiOutlineTrash } from "react-icons/hi";
 
 function Cart() {
   const [cartItems, setCartItems] = useState([]);
   const [message, setMessage] = useState("");
+
   const [showAddressForm, setShowAddressForm] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
 
   const [addressForm, setAddressForm] = useState({
     full_name: "",
@@ -22,10 +26,7 @@ function Cart() {
     const loadCart = async () => {
       try {
         const response = await api.get("/cart");
-
-        if (isMounted) {
-          setCartItems(response.data);
-        }
+        if (isMounted) setCartItems(response.data);
       } catch (error) {
         if (isMounted) {
           setMessage(error.response?.data?.message || "Failed to load cart");
@@ -65,7 +66,7 @@ function Cart() {
   const removeItem = async (cartId) => {
     try {
       await api.delete(`/cart/${cartId}`);
-
+      window.dispatchEvent(new Event("cartUpdated"));
       setCartItems((prevItems) =>
         prevItems.filter((item) => item.cart_id !== cartId)
       );
@@ -77,10 +78,16 @@ function Cart() {
   };
 
   const checkoutCart = async (addressId) => {
+    if (!addressId) {
+      setMessage("Please select a shipping address");
+      return;
+    }
+
     try {
       await api.post("/cart/checkout", {
         address_id: addressId
       });
+      window.dispatchEvent(new Event("cartUpdated"));
 
       setCartItems([]);
       setShowAddressForm(false);
@@ -95,17 +102,34 @@ function Cart() {
       const response = await api.get("/addresses");
       const addresses = response.data;
 
+      setSavedAddresses(addresses);
+      setShowAddressForm(true);
+
       if (addresses.length > 0) {
         const defaultAddress =
           addresses.find((address) => address.is_default) || addresses[0];
 
-        await checkoutCart(defaultAddress.id);
-      } else {
-        setShowAddressForm(true);
-        setMessage("Please add your shipping address first");
+        setSelectedAddressId(defaultAddress.id);
       }
     } catch (error) {
       setMessage(error.response?.data?.message || "Please login first");
+    }
+  };
+
+  const deleteAddress = async (addressId) => {
+    try {
+      await api.delete(`/addresses/${addressId}`);
+
+      const response = await api.get("/addresses");
+      setSavedAddresses(response.data);
+
+      if (selectedAddressId === addressId) {
+        setSelectedAddressId(
+          response.data.length > 0 ? response.data[0].id : null
+        );
+      }
+    } catch (error) {
+      setMessage(error.response?.data?.message || "Failed to delete address");
     }
   };
 
@@ -120,18 +144,12 @@ function Cart() {
     e.preventDefault();
 
     try {
-      await api.post("/addresses", addressForm);
+      const response = await api.post("/addresses", addressForm);
+      const newAddress = response.data.address || response.data;
 
       const addressResponse = await api.get("/addresses");
-      const addresses = addressResponse.data;
-
-      const defaultAddress =
-        addresses.find((address) => address.is_default) ||
-        addresses[addresses.length - 1];
-
-      if (defaultAddress) {
-        await checkoutCart(defaultAddress.id);
-      }
+      setSavedAddresses(addressResponse.data);
+      setSelectedAddressId(newAddress.id);
 
       setAddressForm({
         full_name: "",
@@ -142,6 +160,8 @@ function Cart() {
         street_address: "",
         is_default: true
       });
+
+      await checkoutCart(newAddress.id);
     } catch (error) {
       setMessage(error.response?.data?.message || "Failed to save address");
     }
@@ -246,8 +266,8 @@ function Cart() {
         )}
 
         {showAddressForm && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.modalBox}>
+          <div style={styles.overlay}>
+            <div style={styles.modal}>
               <button
                 type="button"
                 style={styles.closeBtn}
@@ -256,14 +276,70 @@ function Cart() {
                 ×
               </button>
 
-              <h2 style={styles.addressTitle}>Add Shipping Address</h2>
+              <h2 style={styles.modalTitle}>Shipping Address</h2>
+
               <p style={styles.modalSubtitle}>
-                Please add your shipping address before checkout.
+                Select an existing address or add a new one.
               </p>
+
+              {savedAddresses.length > 0 && (
+                <div style={styles.savedAddressBox}>
+                  <h3>Select Shipping Address</h3>
+
+                  {savedAddresses.map((address) => (
+                    <div
+                      key={address.id}
+                      style={{
+                        ...styles.addressOption,
+                        border:
+                          selectedAddressId === address.id
+                            ? "2px solid #2563eb"
+                            : "1px solid #e5e7eb",
+                        background:
+                          selectedAddressId === address.id
+                            ? "#eff6ff"
+                            : "#ffffff"
+                      }}
+                      onClick={() => setSelectedAddressId(address.id)}
+                    >
+                      <div style={styles.addressLeft}>
+                        <input
+                          type="radio"
+                          name="address"
+                          checked={selectedAddressId === address.id}
+                          onChange={() => setSelectedAddressId(address.id)}
+                        />
+
+                        <div>
+                          <strong>{address.full_name}</strong>
+                          <br />
+                          {address.phone}
+                          <br />
+                          {address.street_address}, {address.city},{" "}
+                          {address.postal_code}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        style={styles.deleteBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteAddress(address.id);
+                        }}
+                        title="Delete Address"
+                      >
+                        <HiOutlineTrash size={20} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <h3 style={styles.addAddressTitle}>Add New Address</h3>
 
               <form onSubmit={saveAddressAndCheckout} style={styles.addressForm}>
                 <input
-                  type="text"
                   name="full_name"
                   placeholder="Full Name"
                   value={addressForm.full_name}
@@ -273,7 +349,6 @@ function Cart() {
                 />
 
                 <input
-                  type="text"
                   name="phone"
                   placeholder="Phone Number"
                   value={addressForm.phone}
@@ -283,7 +358,6 @@ function Cart() {
                 />
 
                 <input
-                  type="text"
                   name="country"
                   placeholder="Country"
                   value={addressForm.country}
@@ -293,7 +367,6 @@ function Cart() {
                 />
 
                 <input
-                  type="text"
                   name="city"
                   placeholder="City"
                   value={addressForm.city}
@@ -303,7 +376,6 @@ function Cart() {
                 />
 
                 <input
-                  type="text"
                   name="postal_code"
                   placeholder="Postal Code"
                   value={addressForm.postal_code}
@@ -321,9 +393,19 @@ function Cart() {
                   required
                 />
 
-                <button type="submit" style={styles.saveBtn}>
-                  Save Address & Checkout
-                </button>
+                <div style={styles.buttonRow}>
+                  <button type="submit" style={styles.saveBtn}>
+                    Save Address & Checkout
+                  </button>
+
+                  <button
+                    type="button"
+                    style={styles.finalOrderBtn}
+                    onClick={() => checkoutCart(selectedAddressId)}
+                  >
+                    Checkout Selected Address
+                  </button>
+                </div>
               </form>
             </div>
           </div>
@@ -339,16 +421,19 @@ const styles = {
     background: "#f5f5f5",
     minHeight: "calc(100vh - 70px)"
   },
-    container: {
-  maxWidth: "1400px",
-  margin: "0 auto",
-  padding: "0 30px"
-},
+
+  container: {
+    maxWidth: "1400px",
+    margin: "0 auto",
+    padding: "0 30px"
+  },
+
   title: {
     fontSize: "34px",
     marginBottom: "25px",
     color: "#111827"
   },
+
   message: {
     background: "#eff6ff",
     color: "#2563eb",
@@ -356,16 +441,19 @@ const styles = {
     borderRadius: "8px",
     marginBottom: "20px"
   },
+
   layout: {
     display: "grid",
     gridTemplateColumns: "1fr 320px",
     gap: "25px",
     alignItems: "start"
   },
+
   cartList: {
     display: "grid",
     gap: "18px"
   },
+
   cartCard: {
     background: "#ffffff",
     padding: "18px",
@@ -376,6 +464,7 @@ const styles = {
     gap: "18px",
     alignItems: "center"
   },
+
   image: {
     width: "120px",
     height: "120px",
@@ -384,21 +473,29 @@ const styles = {
     borderRadius: "10px",
     border: "1px solid #e5e7eb"
   },
+
+  info: {
+    minWidth: 0
+  },
+
   productTitle: {
     fontSize: "18px",
     marginBottom: "8px",
     color: "#111827"
   },
+
   price: {
     color: "#f97316",
     fontWeight: "700",
     marginBottom: "12px"
   },
+
   qtyBox: {
     display: "flex",
     alignItems: "center",
     gap: "10px"
   },
+
   qtyBtn: {
     width: "32px",
     height: "32px",
@@ -408,19 +505,23 @@ const styles = {
     cursor: "pointer",
     fontWeight: "700"
   },
+
   qty: {
     minWidth: "25px",
     textAlign: "center",
     fontWeight: "700"
   },
+
   right: {
     textAlign: "right"
   },
+
   subtotal: {
     display: "block",
     color: "#111827",
     marginBottom: "14px"
   },
+
   removeBtn: {
     background: "#ef4444",
     color: "#ffffff",
@@ -429,6 +530,7 @@ const styles = {
     borderRadius: "8px",
     cursor: "pointer"
   },
+
   summary: {
     background: "#ffffff",
     padding: "22px",
@@ -437,20 +539,24 @@ const styles = {
     position: "sticky",
     top: "90px"
   },
+
   summaryTitle: {
     fontSize: "22px",
     marginBottom: "18px",
     color: "#111827"
   },
+
   summaryRow: {
     display: "flex",
     justifyContent: "space-between",
     marginBottom: "14px",
     color: "#374151"
   },
+
   total: {
     color: "#f97316"
   },
+
   paymentBox: {
     background: "#f9fafb",
     padding: "14px",
@@ -459,6 +565,7 @@ const styles = {
     margin: "18px 0",
     lineHeight: "1.7"
   },
+
   checkoutBtn: {
     width: "100%",
     padding: "13px",
@@ -469,33 +576,37 @@ const styles = {
     cursor: "pointer",
     fontWeight: "700"
   },
+
   emptyBox: {
     background: "#fff",
     padding: "40px",
     borderRadius: "12px",
     textAlign: "center"
   },
-  modalOverlay: {
+
+  overlay: {
     position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: "rgba(0,0,0,0.55)",
+    inset: 0,
+    background: "rgba(0,0,0,0.65)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 999
+    zIndex: 9999,
+    padding: "20px"
   },
-  modalBox: {
-    width: "650px",
+
+  modal: {
+    width: "1100px",
     maxWidth: "95%",
+    maxHeight: "90vh",
+    overflowY: "auto",
     background: "#ffffff",
-    padding: "30px",
     borderRadius: "18px",
+    padding: "24px",
     position: "relative",
     boxShadow: "0 20px 50px rgba(0,0,0,0.25)"
   },
+
   closeBtn: {
     position: "absolute",
     top: "14px",
@@ -506,41 +617,118 @@ const styles = {
     cursor: "pointer",
     color: "#6b7280"
   },
-  addressTitle: {
+
+  modalTitle: {
     fontSize: "26px",
-    marginBottom: "8px"
+    marginBottom: "8px",
+    color: "#111827"
   },
+
   modalSubtitle: {
     color: "#6b7280",
     marginBottom: "20px"
   },
+
+  savedAddressBox: {
+    background: "#f9fafb",
+    padding: "16px",
+    borderRadius: "12px",
+    border: "1px solid #e5e7eb",
+    marginBottom: "20px",
+    maxHeight: "230px",
+    overflowY: "auto"
+  },
+
+  addressOption: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "16px",
+    borderRadius: "10px",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+    marginTop: "10px",
+    lineHeight: "1.6"
+  },
+
+  addressLeft: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "12px",
+    flex: 1
+  },
+
+  deleteBtn: {
+    width: "40px",
+    height: "40px",
+    border: "none",
+    borderRadius: "50%",
+    background: "#fee2e2",
+    color: "#dc2626",
+    cursor: "pointer",
+    fontSize: "18px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+
+  addAddressTitle: {
+    marginBottom: "12px",
+    color: "#111827"
+  },
+
   addressForm: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "15px"
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: "16px"
   },
+
   input: {
     padding: "13px",
     border: "1px solid #d1d5db",
     borderRadius: "8px",
     fontSize: "15px"
   },
+
   textarea: {
-    gridColumn: "1 / 3",
+    gridColumn: "1 / -1",
     padding: "13px",
     border: "1px solid #d1d5db",
     borderRadius: "8px",
     fontSize: "15px",
-    minHeight: "90px"
+    minHeight: "70px",
+    resize: "vertical"
   },
+
+  buttonRow: {
+    gridColumn: "1 / -1",
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "18px",
+    marginTop: "18px"
+  },
+
   saveBtn: {
-    gridColumn: "1 / 3",
-    padding: "14px",
+    width: "100%",
+    padding: "16px",
     background: "#2563eb",
     color: "#ffffff",
     border: "none",
-    borderRadius: "8px",
+    borderRadius: "10px",
     cursor: "pointer",
+    fontSize: "16px",
+    fontWeight: "700"
+  },
+
+  finalOrderBtn: {
+    width: "100%",
+    padding: "16px",
+    background: "#10b981",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "10px",
+    cursor: "pointer",
+    fontSize: "16px",
     fontWeight: "700"
   }
 };

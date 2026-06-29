@@ -581,7 +581,6 @@ def get_dummyjson_products():
     
 @api.route("/recommendations/best-deals", methods=["GET"])
 def best_deals():
-
     fake_response = requests.get("https://fakestoreapi.com/products")
     dummy_response = requests.get("https://dummyjson.com/products")
 
@@ -596,52 +595,45 @@ def best_deals():
 
     deals = []
 
-    # FakeStore products
     for product in fake_products:
-
         rating = product.get("rating", {}).get("rate", 0)
         price = product.get("price", 1)
+        discount = 0
 
         deal_score = (rating * 20) - (price / 10)
 
         deals.append({
+            "id": product["id"],
             "source": "FakeStore",
             "title": product["title"],
             "price": price,
             "rating": rating,
-            "discount": 0,
-            "deal_score": round(deal_score, 2)
+            "discount": discount,
+            "deal_score": round(deal_score, 2),
+            "thumbnail_url": product["image"]
         })
 
-    # DummyJSON products
     for product in dummy_products:
-
         rating = product.get("rating", 0)
         price = product.get("price", 1)
         discount = product.get("discountPercentage", 0)
 
-        deal_score = (
-            (rating * 20)
-            + discount
-            - (price / 10)
-        )
+        deal_score = (rating * 20) + discount - (price / 10)
 
         deals.append({
+            "id": product["id"],
             "source": "DummyJSON",
             "title": product["title"],
             "price": price,
             "rating": rating,
             "discount": discount,
-            "deal_score": round(deal_score, 2)
+            "deal_score": round(deal_score, 2),
+            "thumbnail_url": product["thumbnail"]
         })
 
-    deals.sort(
-        key=lambda x: x["deal_score"],
-        reverse=True
-    )
+    deals.sort(key=lambda x: x["deal_score"], reverse=True)
 
     return jsonify(deals[:20]), 200
-
 
 # =========================
 # ORDER ROUTES
@@ -1540,3 +1532,19 @@ def change_password():
     return jsonify({
         "message": "Password changed successfully"
     }), 200
+
+
+@api.route("/addresses/<int:id>", methods=["DELETE"])
+@jwt_required()
+def delete_address(id):
+    user_id = get_jwt_identity()
+
+    address = Address.query.filter_by(id=id, user_id=user_id).first()
+
+    if not address:
+        return jsonify({"message": "Address not found"}), 404
+
+    db.session.delete(address)
+    db.session.commit()
+
+    return jsonify({"message": "Address deleted successfully"})

@@ -15,6 +15,7 @@ import AdminOrders from "./pages/admin/AdminOrders";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminCategories from "./pages/admin/AdminCategories";
+import BestDeals from "./pages/BestDeals";
 
 import Navbar from "./components/Navbar";
 
@@ -39,6 +40,7 @@ function App() {
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/products" element={<AdminProducts />} />
         <Route path="/admin/categories" element={<AdminCategories />} />
+         <Route path="/best-deals" element={<BestDeals />} />
       </Routes>
     </>
   );

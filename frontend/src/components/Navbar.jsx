@@ -45,9 +45,16 @@ useEffect(() => {
 
   if (user) {
     loadCartCount();
+  } else {
+    setCartCount(0);
   }
-}, [user]);
 
+  window.addEventListener("cartUpdated", loadCartCount);
+
+  return () => {
+    window.removeEventListener("cartUpdated", loadCartCount);
+  };
+}, [user]);
   return (
     <nav style={styles.nav}>
       <Link to="/" style={styles.logo}>SmartShop</Link>

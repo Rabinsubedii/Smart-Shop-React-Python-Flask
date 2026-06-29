@@ -11,6 +11,7 @@ function Products() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(8);
 
   const fetchProducts = async () => {
     try {
@@ -56,6 +57,32 @@ function Products() {
     return matchesSearch && matchesCategory && matchesPrice;
   });
 
+  const visibleProducts = filteredProducts.slice(0, visibleCount);
+
+  useEffect(() => {
+    setVisibleCount(8);
+  }, [search, selectedCategory, maxPrice]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - 150
+      ) {
+        setVisibleCount((prev) => {
+          if (prev >= filteredProducts.length) return prev;
+          return prev + 8;
+        });
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [filteredProducts.length]);
+
   const resetFilters = () => {
     setSearch("");
     setSelectedCategory("");
@@ -72,7 +99,7 @@ function Products() {
 
   return (
     <div style={styles.page}>
-    <div style={styles.container}>
+      <div style={styles.container}>
         <div style={styles.header}>
           <div>
             <h1 style={styles.title}>Products</h1>
@@ -81,9 +108,7 @@ function Products() {
             </p>
           </div>
 
-          <div style={styles.countBox}>
-            {filteredProducts.length} Products
-          </div>
+          <div style={styles.countBox}>{filteredProducts.length} Products</div>
         </div>
 
         <div style={styles.topSearch}>
@@ -104,50 +129,58 @@ function Products() {
                 <p>Try another keyword, category, or price range.</p>
               </div>
             ) : (
-              <div style={styles.grid}>
-                {filteredProducts.map((product) => (
-                  <div
-                    style={styles.card}
-                    key={product.id}
-                    onClick={() => navigate(`/products/${product.id}`)}
-                  >
-                    <div style={styles.imageWrap}>
-                      <img
-                        src={product.thumbnail_url || product.main_image_url}
-                        alt={product.title}
-                        style={styles.image}
-                      />
-                    </div>
+              <>
+                <div style={styles.grid}>
+                  {visibleProducts.map((product) => (
+                    <div
+                      style={styles.card}
+                      key={product.id}
+                      onClick={() => navigate(`/products/${product.id}`)}
+                    >
+                      <div style={styles.imageWrap}>
+                        <img
+                          src={product.thumbnail_url || product.main_image_url}
+                          alt={product.title}
+                          style={styles.image}
+                        />
+                      </div>
 
-                    <div style={styles.content}>
-                      <h3 style={styles.productTitle}>
-                        {product.title?.length > 45
-                          ? product.title.substring(0, 45) + "..."
-                          : product.title}
-                      </h3>
+                      <div style={styles.content}>
+                        <h3 style={styles.productTitle}>
+                          {product.title?.length > 45
+                            ? product.title.substring(0, 45) + "..."
+                            : product.title}
+                        </h3>
 
-                      <div style={styles.priceRow}>
-                        <span style={styles.price}>
-                          Rs.{Number(product.price).toLocaleString()}
-                        </span>
-
-                        {product.discount > 0 && (
-                          <span style={styles.discountText}>
-                            -{product.discount}%
+                        <div style={styles.priceRow}>
+                          <span style={styles.price}>
+                            Rs.{Number(product.price).toLocaleString()}
                           </span>
-                        )}
-                      </div>
 
-                      <div style={styles.rating}>
-                        ★★★★☆
-                        <span style={styles.ratingCount}>
-                          ({product.rating || 0})
-                        </span>
+                          {product.discount > 0 && (
+                            <span style={styles.discountText}>
+                              -{product.discount}%
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={styles.rating}>
+                          ★★★★☆
+                          <span style={styles.ratingCount}>
+                            ({product.rating || 0})
+                          </span>
+                        </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+
+                {visibleCount < filteredProducts.length && (
+                  <div style={styles.loadingMore}>
+                    Loading more products...
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
 
@@ -228,16 +261,16 @@ function Products() {
 }
 
 const styles = {
-page: {
-  padding: "40px 0",
-  background: "#f5f5f5",
-  minHeight: "calc(100vh - 70px)"
-},
+  page: {
+    padding: "40px 0",
+    background: "#f5f5f5",
+    minHeight: "calc(100vh - 70px)"
+  },
   container: {
-  maxWidth: "1400px",
-  margin: "0 auto",
-  padding: "0 30px"
-},
+    maxWidth: "1400px",
+    margin: "0 auto",
+    padding: "0 30px"
+  },
   loading: {
     minHeight: "calc(100vh - 70px)",
     display: "flex",
@@ -432,6 +465,13 @@ page: {
     textAlign: "center",
     boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
     color: "#6b7280"
+  },
+  loadingMore: {
+    textAlign: "center",
+    padding: "25px",
+    color: "#6b7280",
+    fontWeight: "600",
+    fontSize: "16px"
   }
 };
 

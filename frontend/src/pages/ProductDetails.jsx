@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../api/axios";
+import { FiTrash2 } from "react-icons/fi";
 
 function ProductDetails() {
   const { id } = useParams();
@@ -70,6 +71,7 @@ function ProductDetails() {
         product_id: product.id,
         quantity: 1
       });
+      window.dispatchEvent(new Event("cartUpdated"));
 
       setMessage("Product added to cart");
     } catch (error) {
@@ -159,6 +161,27 @@ const saveNewAddress = async (e) => {
   if (!product) {
     return <h2 style={{ padding: "40px" }}>Loading product...</h2>;
   }
+
+  const deleteAddress = async (addressId) => {
+  try {
+    await api.delete(`/addresses/${addressId}`);
+
+    const response = await api.get("/addresses");
+    setSavedAddresses(response.data);
+
+    if (selectedAddressId === addressId) {
+      if (response.data.length > 0) {
+        setSelectedAddressId(response.data[0].id);
+      } else {
+        setSelectedAddressId(null);
+      }
+    }
+
+    setMessage("Address deleted successfully.");
+  } catch (error) {
+    setMessage(error.response?.data?.message || "Failed to delete address.");
+  }
+};
 
   const galleryImages = [
     product.main_image_url,
@@ -260,36 +283,55 @@ const saveNewAddress = async (e) => {
 
       {/* EXISTING SAVED ADDRESSES */}
 
-      {savedAddresses.length > 0 && (
-        <div style={styles.savedAddressBox}>
-          <h3>Select Shipping Address</h3>
+     {savedAddresses.length > 0 && (
+  <div style={styles.savedAddressBox}>
+    <h3>Select Shipping Address</h3>
 
-          {savedAddresses.map((address) => (
-            <label
-              key={address.id}
-              style={styles.addressOption}
-            >
-              <input
-                type="radio"
-                name="address"
-                checked={selectedAddressId === address.id}
-                onChange={() => setSelectedAddressId(address.id)}
-              />
+    {savedAddresses.map((address) => (
+      <div
+  key={address.id}
+  style={{
+    ...styles.addressOption,
+    border:
+      selectedAddressId === address.id
+        ? "2px solid #2563eb"
+        : "1px solid #e5e7eb",
+    background:
+      selectedAddressId === address.id
+        ? "#eff6ff"
+        : "#ffffff",
+  }}
+  onClick={() => setSelectedAddressId(address.id)}
+>
+        <div style={styles.addressLeft}>
+          <input
+            type="radio"
+            name="address"
+            checked={selectedAddressId === address.id}
+            onChange={() => setSelectedAddressId(address.id)}
+          />
 
-              <span>
-                <strong>{address.full_name}</strong>
-                <br />
-                {address.phone}
-                <br />
-                {address.street_address}, {address.city},{" "}
-                {address.postal_code}
-              </span>
-            </label>
-          ))}
-
-
+          <div>
+            <strong>{address.full_name}</strong>
+            <br />
+            {address.phone}
+            <br />
+            {address.street_address}, {address.city}, {address.postal_code}
+          </div>
         </div>
-      )}
+
+        <button
+          type="button"
+          style={styles.deleteBtn}
+          onClick={() => deleteAddress(address.id)}
+          title="Delete Address"
+        >
+          <FiTrash2 size={18} />
+        </button>
+      </div>
+    ))}
+  </div>
+)}
 
       {/* ADD NEW ADDRESS */}
       <h3 style={styles.addAddressTitle}>Add New Address</h3>
@@ -350,7 +392,7 @@ const saveNewAddress = async (e) => {
 
        <div style={styles.buttonRow}>
           <button type="submit" style={styles.saveBtn}>
-            Save Address & Place Order
+            Save New Address 
           </button>
 
           <button
@@ -376,6 +418,39 @@ const styles = {
     minHeight: "calc(100vh - 70px)",
     padding: "40px"
   },
+
+  addressLeft: {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: "12px",
+  flex: 1
+},
+
+addressOption: {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  background: "#ffffff",
+  padding: "16px",
+  borderRadius: "10px",
+  border: "1px solid #e5e7eb",
+  marginTop: "10px"
+},
+
+deleteBtn: {
+  width: "40px",
+  height: "40px",
+  border: "none",
+  borderRadius: "50%",
+  background: "#fee2e2",
+  color: "#dc2626",
+  cursor: "pointer",
+  fontSize: "18px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "0.2s ease"
+},
 
 buttonRow: {
   gridColumn: "1 / -1",
