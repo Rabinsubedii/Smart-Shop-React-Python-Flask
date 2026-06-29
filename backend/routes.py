@@ -1511,3 +1511,32 @@ def checkout_cart():
         "total_amount": total_amount
     }), 201
 
+@api.route("/auth/change-password", methods=["PUT"])
+@jwt_required()
+def change_password():
+    user_id = get_jwt_identity()
+    data = request.get_json()
+
+    current_password = data.get("current_password")
+    new_password = data.get("new_password")
+
+    if not current_password or not new_password:
+        return jsonify({
+            "message": "Current password and new password are required"
+        }), 400
+
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    if not bcrypt.check_password_hash(user.password, current_password):
+        return jsonify({"message": "Current password is incorrect"}), 400
+
+    user.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Password changed successfully"
+    }), 200
