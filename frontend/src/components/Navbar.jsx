@@ -139,7 +139,7 @@ const styles = {
   link: {
     color: "#111827",
     textDecoration: "none",
-    fontWeight: "600",
+    fontWeight: "500",
     fontSize: "15px"
   },
   cart: {
