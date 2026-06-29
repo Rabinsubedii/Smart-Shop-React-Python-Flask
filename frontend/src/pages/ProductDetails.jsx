@@ -10,6 +10,8 @@ function ProductDetails() {
   const [message, setMessage] = useState("");
 
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [addressForm, setAddressForm] = useState({
     full_name: "",
     phone: "",
@@ -76,43 +78,47 @@ function ProductDetails() {
   };
 
   const checkoutDirectly = async (addressId) => {
-    try {
-      await api.post("/orders", {
-        address_id: addressId,
-        payment_method: "Cash on Delivery",
-        items: [
-          {
-            product_id: product.id,
-            quantity: 1
-          }
-        ]
-      });
+  if (!addressId) {
+    setMessage("Please select a shipping address");
+    return;
+  }
 
-      setShowAddressModal(false);
-      setMessage("Order placed successfully with Cash on Delivery");
-    } catch (error) {
-      setMessage(error.response?.data?.message || "Failed to place order");
+  try {
+    await api.post("/orders", {
+      address_id: addressId,
+      payment_method: "Cash on Delivery",
+      items: [
+        {
+          product_id: product.id,
+          quantity: 1
+        }
+      ]
+    });
+
+    setShowAddressModal(false);
+    setMessage("Order placed successfully with Cash on Delivery");
+  } catch (error) {
+    console.log(error.response?.data);
+    setMessage(error.response?.data?.message || "Failed to place order");
+  }
+};
+const placeOrder = async () => {
+  try {
+    const response = await api.get("/addresses");
+
+    setSavedAddresses(response.data);
+    setShowAddressModal(true);
+
+    if (response.data.length > 0) {
+      const defaultAddress =
+        response.data.find((address) => address.is_default) || response.data[0];
+
+      setSelectedAddressId(defaultAddress.id);
     }
-  };
-
-  const placeOrder = async () => {
-    try {
-      const response = await api.get("/addresses");
-      const addresses = response.data;
-
-      if (addresses.length > 0) {
-        const defaultAddress =
-          addresses.find((address) => address.is_default) || addresses[0];
-
-        await checkoutDirectly(defaultAddress.id);
-      } else {
-        setShowAddressModal(true);
-        setMessage("Please add shipping address first");
-      }
-    } catch (error) {
-      setMessage(error.response?.data?.message || "Please login first");
-    }
-  };
+  } catch (error) {
+    setMessage(error.response?.data?.message || "Please login first");
+  }
+};
 
   const handleAddressChange = (e) => {
     setAddressForm({
@@ -121,27 +127,35 @@ function ProductDetails() {
     });
   };
 
-  const saveAddressAndOrder = async (e) => {
-    e.preventDefault();
+const saveNewAddress = async (e) => {
+  e.preventDefault();
 
-    try {
-      await api.post("/addresses", addressForm);
+  try {
+    const response = await api.post("/addresses", addressForm);
 
-      const response = await api.get("/addresses");
-      const addresses = response.data;
+    const newAddress = response.data.address || response.data;
 
-      const defaultAddress =
-        addresses.find((address) => address.is_default) ||
-        addresses[addresses.length - 1];
+    const addressResponse = await api.get("/addresses");
+    setSavedAddresses(addressResponse.data);
 
-      if (defaultAddress) {
-        await checkoutDirectly(defaultAddress.id);
-      }
-    } catch (error) {
-      setMessage(error.response?.data?.message || "Failed to save address");
-    }
-  };
+    setSelectedAddressId(newAddress.id);
 
+    setAddressForm({
+      full_name: "",
+      phone: "",
+      country: "Japan",
+      city: "",
+      postal_code: "",
+      street_address: "",
+      is_default: true
+    });
+
+    await checkoutDirectly(newAddress.id);
+
+  } catch (error) {
+    setMessage(error.response?.data?.message || "Failed to save address");
+  }
+};
   if (!product) {
     return <h2 style={{ padding: "40px" }}>Loading product...</h2>;
   }
@@ -225,84 +239,132 @@ function ProductDetails() {
           </div>
         </div>
 
-        {showAddressModal && (
-          <div style={styles.overlay}>
-            <div style={styles.modal}>
-              <button
-                type="button"
-                style={styles.closeBtn}
-                onClick={() => setShowAddressModal(false)}
-              >
-                ×
-              </button>
 
-              <h2 style={styles.modalTitle}>Add Shipping Address</h2>
-              <p style={styles.modalSubtitle}>
-                Please add your address before placing order.
-              </p>
+      {showAddressModal && (
+  <div style={styles.overlay}>
+    <div style={styles.modal}>
 
-              <form onSubmit={saveAddressAndOrder} style={styles.addressForm}>
-                <input
-                  name="full_name"
-                  placeholder="Full Name"
-                  value={addressForm.full_name}
-                  onChange={handleAddressChange}
-                  style={styles.input}
-                  required
-                />
+      <button
+        type="button"
+        style={styles.closeBtn}
+        onClick={() => setShowAddressModal(false)}
+      >
+        ×
+      </button>
 
-                <input
-                  name="phone"
-                  placeholder="Phone Number"
-                  value={addressForm.phone}
-                  onChange={handleAddressChange}
-                  style={styles.input}
-                  required
-                />
+      <h2 style={styles.modalTitle}>Shipping Address</h2>
 
-                <input
-                  name="country"
-                  placeholder="Country"
-                  value={addressForm.country}
-                  onChange={handleAddressChange}
-                  style={styles.input}
-                  required
-                />
+      <p style={styles.modalSubtitle}>
+        Select an existing address or add a new one.
+      </p>
 
-                <input
-                  name="city"
-                  placeholder="City"
-                  value={addressForm.city}
-                  onChange={handleAddressChange}
-                  style={styles.input}
-                  required
-                />
+      {/* EXISTING SAVED ADDRESSES */}
 
-                <input
-                  name="postal_code"
-                  placeholder="Postal Code"
-                  value={addressForm.postal_code}
-                  onChange={handleAddressChange}
-                  style={styles.input}
-                  required
-                />
+      {savedAddresses.length > 0 && (
+        <div style={styles.savedAddressBox}>
+          <h3>Select Shipping Address</h3>
 
-                <textarea
-                  name="street_address"
-                  placeholder="Street Address"
-                  value={addressForm.street_address}
-                  onChange={handleAddressChange}
-                  style={styles.textarea}
-                  required
-                />
+          {savedAddresses.map((address) => (
+            <label
+              key={address.id}
+              style={styles.addressOption}
+            >
+              <input
+                type="radio"
+                name="address"
+                checked={selectedAddressId === address.id}
+                onChange={() => setSelectedAddressId(address.id)}
+              />
 
-                <button type="submit" style={styles.saveBtn}>
-                  Save Address & Place Order
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
+              <span>
+                <strong>{address.full_name}</strong>
+                <br />
+                {address.phone}
+                <br />
+                {address.street_address}, {address.city},{" "}
+                {address.postal_code}
+              </span>
+            </label>
+          ))}
+
+
+        </div>
+      )}
+
+      {/* ADD NEW ADDRESS */}
+      <h3 style={styles.addAddressTitle}>Add New Address</h3>
+      <form onSubmit={saveNewAddress} style={styles.addressForm}>
+        <input
+          name="full_name"
+          placeholder="Full Name"
+          value={addressForm.full_name}
+          onChange={handleAddressChange}
+          style={styles.input}
+          required
+        />
+
+        <input
+          name="phone"
+          placeholder="Phone Number"
+          value={addressForm.phone}
+          onChange={handleAddressChange}
+          style={styles.input}
+          required
+        />
+
+        <input
+          name="country"
+          placeholder="Country"
+          value={addressForm.country}
+          onChange={handleAddressChange}
+          style={styles.input}
+          required
+        />
+
+        <input
+          name="city"
+          placeholder="City"
+          value={addressForm.city}
+          onChange={handleAddressChange}
+          style={styles.input}
+          required
+        />
+
+        <input
+          name="postal_code"
+          placeholder="Postal Code"
+          value={addressForm.postal_code}
+          onChange={handleAddressChange}
+          style={styles.input}
+          required
+        />
+
+        <textarea
+          name="street_address"
+          placeholder="Street Address"
+          value={addressForm.street_address}
+          onChange={handleAddressChange}
+          style={styles.textarea}
+          required
+        />
+
+       <div style={styles.buttonRow}>
+          <button type="submit" style={styles.saveBtn}>
+            Save Address & Place Order
+          </button>
+
+          <button
+            type="button"
+            style={styles.finalOrderBtn}
+            onClick={() => checkoutDirectly(selectedAddressId)}
+          >
+            Order Selected Address
+          </button>
+        </div>
+        </form>
+    </div>
+  </div>
+)}
       </div>
     </div>
   );
@@ -314,10 +376,61 @@ const styles = {
     minHeight: "calc(100vh - 70px)",
     padding: "40px"
   },
+
+buttonRow: {
+  gridColumn: "1 / -1",
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "18px",
+  marginTop: "18px"
+},
+
+  finalOrderBox: {
+  marginTop: "22px",
+  borderTop: "1px solid #e5e7eb",
+  paddingTop: "18px"
+},
+
+finalOrderBtn: {
+  width: "100%",
+  padding: "16px",
+  background: "#10b981",
+  color: "#ffffff",
+  border: "none",
+  borderRadius: "10px",
+  cursor: "pointer",
+  fontSize: "16px"
+},
+  addAddressTitle: {
+  marginBottom: "12px",
+  color: "#111827"
+},
   container: {
     maxWidth: "1200px",
     margin: "0 auto"
   },
+
+  savedAddressBox: {
+   background: "#f9fafb",
+  padding: "16px",
+  borderRadius: "12px",
+  border: "1px solid #e5e7eb",
+  marginBottom: "20px",
+  maxHeight: "230px",
+  overflowY: "auto"
+},
+
+addressOption: {
+  display: "flex",
+  gap: "10px",
+  background: "#ffffff",
+  padding: "12px",
+  borderRadius: "10px",
+  border: "1px solid #e5e7eb",
+  marginTop: "10px",
+  cursor: "pointer",
+  lineHeight: "1.6"
+},
   message: {
     background: "#eff6ff",
     color: "#2563eb",
@@ -450,24 +563,59 @@ const styles = {
     cursor: "pointer",
     fontWeight: "700"
   },
-  overlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.55)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1000
-  },
-  modal: {
-    width: "650px",
-    maxWidth: "95%",
-    background: "#ffffff",
-    borderRadius: "18px",
-    padding: "30px",
-    position: "relative",
-    boxShadow: "0 20px 50px rgba(0,0,0,0.25)"
-  },
+ overlay: {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  background: "rgba(0,0,0,0.65)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 9999,
+  padding: "20px"
+},
+
+modal: {
+  width: "1100px",
+  maxWidth: "95%",
+  maxHeight: "90vh",
+  overflowY: "auto",
+  background: "#ffffff",
+  borderRadius: "18px",
+  padding: "24px",
+  position: "relative",
+  boxShadow: "0 20px 50px rgba(0,0,0,0.25)"
+},
+
+addressForm: {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: "16px"
+},
+
+textarea: {
+  gridColumn: "1 / -1",
+  padding: "13px",
+  borderRadius: "8px",
+  border: "1px solid #d1d5db",
+  minHeight: "70px",
+  resize: "vertical"
+},
+
+
+saveBtn: {
+  width: "100%",
+  padding: "16px",
+  background: "#2563eb",
+  color: "#ffffff",
+  border: "none",
+  borderRadius: "10px",
+  cursor: "pointer",
+  fontSize: "16px"
+},
+
   closeBtn: {
     position: "absolute",
     top: "14px",
@@ -486,33 +634,15 @@ const styles = {
     color: "#6b7280",
     marginBottom: "20px"
   },
-  addressForm: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "14px"
-  },
+
   input: {
     padding: "13px",
     borderRadius: "8px",
     border: "1px solid #d1d5db"
   },
-  textarea: {
-    gridColumn: "1 / 3",
-    padding: "13px",
-    borderRadius: "8px",
-    border: "1px solid #d1d5db",
-    minHeight: "90px"
-  },
-  saveBtn: {
-    gridColumn: "1 / 3",
-    padding: "14px",
-    background: "#2563eb",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "700"
-  }
+
+
+  
 };
 
 export default ProductDetails;
