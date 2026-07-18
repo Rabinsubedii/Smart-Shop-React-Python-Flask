@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
 import api from "../api/axios";
 import { FiTrash2 } from "react-icons/fi";
-
+import { useParams, useLocation } from "react-router-dom";
 function ProductDetails() {
   const { id } = useParams();
+  const location = useLocation();
+  const isExternalProduct =
+  id?.startsWith("dummyjson-") ||
+  id?.startsWith("fakestore-");
 
   const [product, setProduct] = useState(null);
   const [mainImage, setMainImage] = useState("");
@@ -22,36 +25,89 @@ function ProductDetails() {
     street_address: "",
     is_default: true
   });
-
   useEffect(() => {
-    let isMounted = true;
+  let isMounted = true;
 
-    const loadProduct = async () => {
-      try {
-        const response = await api.get(`/products/${id}`);
+  const loadProduct = async () => {
+    try {
+      // Product passed from Best Deals page
+      if (location.state?.product) {
+        const passedProduct = location.state.product;
 
         if (isMounted) {
-          setProduct(response.data);
+          setProduct(passedProduct);
           setMainImage(
-            response.data.main_image_url ||
-              response.data.thumbnail_url ||
-              response.data.images?.[0] ||
-              ""
+            passedProduct.main_image_url ||
+            passedProduct.thumbnail_url ||
+            passedProduct.images?.[0] ||
+            ""
           );
         }
-      } catch (error) {
-        if (isMounted) {
-          setMessage(error.response?.data?.message || "Failed to load product");
-        }
+
+        localStorage.setItem(
+          "selectedBestDeal",
+          JSON.stringify(passedProduct)
+        );
+
+        return;
       }
-    };
 
-    loadProduct();
+      // External product opened in new tab or refreshed
+      if (isExternalProduct) {
+        const savedProduct = localStorage.getItem("selectedBestDeal");
 
-    return () => {
-      isMounted = false;
-    };
-  }, [id]);
+        if (savedProduct) {
+          const parsedProduct = JSON.parse(savedProduct);
+
+          if (parsedProduct.id === id && isMounted) {
+            setProduct(parsedProduct);
+            setMainImage(
+              parsedProduct.main_image_url ||
+              parsedProduct.thumbnail_url ||
+              parsedProduct.images?.[0] ||
+              ""
+            );
+
+            return;
+          }
+        }
+
+        if (isMounted) {
+          setMessage(
+            "Product information is unavailable. Please open it again from Best Deals."
+          );
+        }
+
+        return;
+      }
+
+      // Normal PostgreSQL product
+      const response = await api.get(`/products/${id}`);
+
+      if (isMounted) {
+        setProduct(response.data);
+        setMainImage(
+          response.data.main_image_url ||
+          response.data.thumbnail_url ||
+          response.data.images?.[0] ||
+          ""
+        );
+      }
+    } catch (error) {
+      if (isMounted) {
+        setMessage(
+          error.response?.data?.message || "Failed to load product"
+        );
+      }
+    }
+  };
+
+  loadProduct();
+
+  return () => {
+    isMounted = false;
+  };
+}, [id, location.state, isExternalProduct]);
 
   const addToWishlist = async () => {
     try {
@@ -158,9 +214,13 @@ const saveNewAddress = async (e) => {
     setMessage(error.response?.data?.message || "Failed to save address");
   }
 };
-  if (!product) {
-    return <h2 style={{ padding: "40px" }}>Loading product...</h2>;
-  }
+if (!product) {
+  return (
+    <div style={{ padding: "40px", textAlign: "center" }}>
+      <h2>{message || "Loading product..."}</h2>
+    </div>
+  );
+}
 
   const deleteAddress = async (addressId) => {
   try {

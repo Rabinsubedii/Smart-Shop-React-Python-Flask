@@ -10,6 +10,18 @@ function BestDeals() {
   const [loading, setLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(8);
 
+  const openProductDetails = (product) => {
+  localStorage.setItem(
+    "selectedBestDeal",
+    JSON.stringify(product)
+  );
+
+  navigate(`/best-deals/${product.id}`, {
+    state: { product }
+  });
+};
+
+
   useEffect(() => {
     let isMounted = true;
 
@@ -69,13 +81,7 @@ function BestDeals() {
     return <div style={styles.loading}>Loading best deals...</div>;
   }
 
-  const openProductDetails = (product) => {
-    sessionStorage.setItem("selectedBestDeal", JSON.stringify(product));
 
-    navigate(`/best-deals/${product.id}`, {
-      state: { product },
-    });
-  };
   return (
     <div style={styles.page}>
       <div style={styles.container}>
@@ -139,8 +145,7 @@ function BestDeals() {
                     </div>
 
                     <button
-                      type="button"
-			style={styles.viewBtn}
+                      type="button"style={styles.viewBtn}
                       onClick={(event) => {
                         event.stopPropagation();
                         openProductDetails(product);
