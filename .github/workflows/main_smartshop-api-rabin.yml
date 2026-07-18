@@ -1,0 +1,53 @@
+# Deploy Flask backend to Azure App Service
+
+name: Build and deploy Flask backend to Azure - smartshop-api-rabin
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Download repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Configure Python
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      # Validate backend dependencies
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Login using the Azure credentials created by Deployment Center
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_AABD253D244145B3954900A92D02D2ED }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_E8E3714C49B04D009E6BEEC139F17688 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_AD741D3BFAE54EA5ACB9FF765E75D792 }}
+
+      # Deploy only the Flask backend folder
+      - name: Deploy Flask backend to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: "smartshop-api-rabin"
+          slot-name: "Production"
+          package: "./backend"
