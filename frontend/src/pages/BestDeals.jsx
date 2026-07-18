@@ -19,13 +19,15 @@ function BestDeals() {
 
         if (isMounted) {
           const result = Array.isArray(response.data)
-          ? response.data
-          : response.data.products || [];
+            ? response.data
+            : response.data.products || [];
           setDeals(result);
         }
       } catch (error) {
         if (isMounted) {
-          setMessage(error.response?.data?.message || "Failed to load best deals");
+          setMessage(
+            error.response?.data?.message || "Failed to load best deals",
+          );
         }
       } finally {
         if (isMounted) {
@@ -67,6 +69,13 @@ function BestDeals() {
     return <div style={styles.loading}>Loading best deals...</div>;
   }
 
+  const openProductDetails = (product) => {
+    sessionStorage.setItem("selectedBestDeal", JSON.stringify(product));
+
+    navigate(`/best-deals/${product.id}`, {
+      state: { product },
+    });
+  };
   return (
     <div style={styles.page}>
       <div style={styles.container}>
@@ -89,7 +98,7 @@ function BestDeals() {
                 <div
                   key={`${product.source}-${product.id}`}
                   style={styles.card}
-                  onClick={() => navigate(`/products/${product.id}`)}
+                 onClick={() => openProductDetails(product)}
                 >
                   <div style={styles.imageBox}>
                     {Number(product.discount) > 0 && (
@@ -129,16 +138,23 @@ function BestDeals() {
                       <strong>{product.deal_score}</strong>
                     </div>
 
-                    <button style={styles.viewBtn}>View Deal</button>
+                    <button
+                      type="button"
+			style={styles.viewBtn}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openProductDetails(product);
+                      }}
+                    >
+                      View Product
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
 
             {visibleCount < deals.length && (
-              <div style={styles.loadingMore}>
-                Loading more deals...
-              </div>
+              <div style={styles.loadingMore}>Loading more deals...</div>
             )}
           </>
         )}
@@ -151,18 +167,18 @@ const styles = {
   page: {
     background: "#f5f5f5",
     minHeight: "calc(100vh - 70px)",
-    padding: "40px"
+    padding: "40px",
   },
   container: {
     maxWidth: "1250px",
-    margin: "0 auto"
+    margin: "0 auto",
   },
   loading: {
     minHeight: "calc(100vh - 70px)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "20px"
+    fontSize: "20px",
   },
   hero: {
     background: "linear-gradient(135deg, #111827, #2563eb)",
@@ -170,42 +186,42 @@ const styles = {
     padding: "45px",
     borderRadius: "20px",
     marginBottom: "30px",
-    boxShadow: "0 8px 25px rgba(0,0,0,0.15)"
+    boxShadow: "0 8px 25px rgba(0,0,0,0.15)",
   },
   badge: {
     background: "rgba(255,255,255,0.18)",
     padding: "8px 14px",
     borderRadius: "20px",
     fontWeight: "700",
-    fontSize: "13px"
+    fontSize: "13px",
   },
   title: {
     fontSize: "44px",
     marginTop: "18px",
-    marginBottom: "10px"
+    marginBottom: "10px",
   },
   subtitle: {
     opacity: 0.9,
-    fontSize: "17px"
+    fontSize: "17px",
   },
   message: {
     background: "#eff6ff",
     color: "#2563eb",
     padding: "12px",
     borderRadius: "8px",
-    marginBottom: "20px"
+    marginBottom: "20px",
   },
   grid: {
     display: "grid",
     gridTemplateColumns: "repeat(4, 1fr)",
-    gap: "22px"
+    gap: "22px",
   },
   card: {
     background: "#ffffff",
     borderRadius: "18px",
     overflow: "hidden",
     boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
-    cursor: "pointer"
+    cursor: "pointer",
   },
   imageBox: {
     height: "190px",
@@ -214,7 +230,7 @@ const styles = {
     borderBottom: "1px solid #e5e7eb",
     display: "flex",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
   },
   discountBadge: {
     position: "absolute",
@@ -225,43 +241,43 @@ const styles = {
     padding: "6px 10px",
     borderRadius: "20px",
     fontSize: "12px",
-    fontWeight: "800"
+    fontWeight: "800",
   },
   image: {
     width: "100%",
     height: "100%",
     objectFit: "contain",
-    padding: "14px"
+    padding: "14px",
   },
   body: {
-    padding: "18px"
+    padding: "18px",
   },
   productTitle: {
     fontSize: "17px",
     color: "#111827",
     minHeight: "45px",
-    marginBottom: "10px"
+    marginBottom: "10px",
   },
   desc: {
     color: "#6b7280",
     fontSize: "14px",
     lineHeight: "1.5",
     minHeight: "42px",
-    marginBottom: "14px"
+    marginBottom: "14px",
   },
   infoRow: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: "12px"
+    marginBottom: "12px",
   },
   price: {
     color: "#f97316",
-    fontSize: "18px"
+    fontSize: "18px",
   },
   rating: {
     color: "#374151",
-    fontWeight: "700"
+    fontWeight: "700",
   },
   dealBox: {
     background: "#f9fafb",
@@ -270,7 +286,7 @@ const styles = {
     padding: "10px",
     display: "flex",
     justifyContent: "space-between",
-    marginBottom: "14px"
+    marginBottom: "14px",
   },
   viewBtn: {
     width: "100%",
@@ -280,7 +296,7 @@ const styles = {
     border: "none",
     borderRadius: "10px",
     cursor: "pointer",
-    fontWeight: "700"
+    fontWeight: "700",
   },
   emptyBox: {
     background: "#ffffff",
@@ -288,15 +304,15 @@ const styles = {
     borderRadius: "16px",
     textAlign: "center",
     color: "#6b7280",
-    boxShadow: "0 4px 14px rgba(0,0,0,0.08)"
+    boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
   },
   loadingMore: {
     textAlign: "center",
     padding: "25px",
     color: "#6b7280",
     fontWeight: "600",
-    fontSize: "16px"
-  }
+    fontSize: "16px",
+  },
 };
 
 export default BestDeals;
