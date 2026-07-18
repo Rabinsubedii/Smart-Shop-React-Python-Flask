@@ -581,60 +581,95 @@ def get_dummyjson_products():
     
 @api.route("/recommendations/best-deals", methods=["GET"])
 def best_deals():
-    fake_response = requests.get("https://fakestoreapi.com/products")
-    dummy_response = requests.get("https://dummyjson.com/products")
-
-    if fake_response.status_code != 200:
-        return jsonify({"message": "FakeStore API failed"}), 500
-
-    if dummy_response.status_code != 200:
-        return jsonify({"message": "DummyJSON API failed"}), 500
-
-    fake_products = fake_response.json()
-    dummy_products = dummy_response.json()["products"]
-
     deals = []
+    warnings = []
 
-    for product in fake_products:
-        rating = product.get("rating", {}).get("rate", 0)
-        price = product.get("price", 1)
-        discount = 0
+    # FakeStore API
+    try:
+        fake_response = requests.get(
+            "https://fakestoreapi.com/products",
+            timeout=15
+        )
+        fake_response.raise_for_status()
 
-        deal_score = (rating * 20) - (price / 10)
+        fake_products = fake_response.json()
 
-        deals.append({
-            "id": product["id"],
-            "source": "FakeStore",
-            "title": product["title"],
-            "price": price,
-            "rating": rating,
-            "discount": discount,
-            "deal_score": round(deal_score, 2),
-            "thumbnail_url": product["image"]
-        })
+        for product in fake_products:
+            rating = float(
+                product.get("rating", {}).get("rate", 0)
+            )
+            price = float(product.get("price", 0))
+            discount = 0
 
-    for product in dummy_products:
-        rating = product.get("rating", 0)
-        price = product.get("price", 1)
-        discount = product.get("discountPercentage", 0)
+            deal_score = (rating * 20) - (price / 10)
 
-        deal_score = (rating * 20) + discount - (price / 10)
+            deals.append({
+                "id": f"fakestore-{product.get('id')}",
+                "external_id": product.get("id"),
+                "source": "FakeStore",
+                "title": product.get("title", "Unknown Product"),
+                "price": price,
+                "rating": rating,
+                "discount": discount,
+                "deal_score": round(deal_score, 2),
+                "thumbnail_url": product.get("image", "")
+            })
 
-        deals.append({
-            "id": product["id"],
-            "source": "DummyJSON",
-            "title": product["title"],
-            "price": price,
-            "rating": rating,
-            "discount": discount,
-            "deal_score": round(deal_score, 2),
-            "thumbnail_url": product["thumbnail"]
-        })
+    except requests.RequestException as error:
+        print(f"FakeStore API error: {error}")
+        warnings.append("FakeStore API failed")
 
-    deals.sort(key=lambda x: x["deal_score"], reverse=True)
+    # DummyJSON API
+    try:
+        dummy_response = requests.get(
+            "https://dummyjson.com/products?limit=100",
+            timeout=15
+        )
+        dummy_response.raise_for_status()
+
+        dummy_products = dummy_response.json().get("products", [])
+
+        for product in dummy_products:
+            rating = float(product.get("rating", 0))
+            price = float(product.get("price", 0))
+            discount = float(
+                product.get("discountPercentage", 0)
+            )
+
+            deal_score = (
+                (rating * 20)
+                + discount
+                - (price / 10)
+            )
+
+            deals.append({
+                "id": f"dummyjson-{product.get('id')}",
+                "external_id": product.get("id"),
+                "source": "DummyJSON",
+                "title": product.get("title", "Unknown Product"),
+                "price": price,
+                "rating": rating,
+                "discount": discount,
+                "deal_score": round(deal_score, 2),
+                "thumbnail_url": product.get("thumbnail", "")
+            })
+
+    except requests.RequestException as error:
+        print(f"DummyJSON API error: {error}")
+        warnings.append("DummyJSON API failed")
+
+    if not deals:
+        return jsonify({
+            "message": "Both external APIs are unavailable.",
+            "warnings": warnings
+        }), 503
+
+    deals.sort(
+        key=lambda product: product["deal_score"],
+        reverse=True
+    )
 
     return jsonify(deals[:20]), 200
-
 # =========================
 # ORDER ROUTES
 # =========================

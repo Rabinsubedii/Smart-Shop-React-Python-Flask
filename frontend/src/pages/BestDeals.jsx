@@ -18,7 +18,10 @@ function BestDeals() {
         const response = await api.get("/recommendations/best-deals");
 
         if (isMounted) {
-          setDeals(response.data);
+          const result = Array.isArray(response.data)
+          ? response.data
+          : response.data.products || [];
+          setDeals(result);
         }
       } catch (error) {
         if (isMounted) {
