@@ -28,17 +28,17 @@ def create_app():
 
     CORS(
         app,
-        resources={
-            r"/api/*": {
-                "origins": allowed_origins
-            },
-            r"/uploads/*": {
-                "origins": allowed_origins
-            }
-        },
-        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization"],
-        supports_credentials=False
+           resources={
+        r"/api/*": {
+            "origins": [
+                "https://smart-shop-react-python-flask.vercel.app",
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+            ]
+        }
+    },
+    allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     )
 
     db.init_app(app)
